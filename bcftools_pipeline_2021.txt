@@ -1,0 +1,162 @@
+NOTES/TROUBLESHOOTING GUIDE: BCFTOOLS PIPELINE FOR GT-SEQ DATA 
+
+Genotyping-in-thousands by sequencing (GT-seq) of non-invasive fecal and degraded samples: 
+	a new panel to enable ongoing monitoring of Canadian polar bear populations
+	
+Kristen Hayward, Rute Clemente-Carvalho, Evelyn Jensen, Peter Van Coeverden de Groot, 
+	Marsha Branigan, Markus Dyck, Christina Tschritter, Zhengxin Sun, Stephen Lougheed
+	
+
+
+** A. DEMULTIPLEXING FASTQ FILES **
+
+Note: Demultiplexing steps are pulled from Nate Campbell 2015 GT-seq pipeline,
+	uses GTseq_BarcodeSplit_MP.py script from Campbell et al. (2015) github
+	
+See Nate Campbell GTseq-Pipeline for scripts: https://github.com/GTseq/GTseq-Pipeline
+
+- important note = if NOVASEQ was used, i5 sequences need to be in reverse complement in input file
+- create csv file with barcodes - e.g.
+	Sample_name,Plate_ID,i7_name,i7_sequence,i5_name,i5_sequence
+	Sample1,plate_1,GTSeq_001,ATCACG,A01,CCGTTT
+	Sample1,plate_1,GTSeq_001,ATCACG,B01,AAGAGT
+	Sample1,plate_1,GTSeq_001,ATCACG,C01,CGGAAT
+	Sample1,plate_1,GTSeq_001,ATCACG,D01,GCCTCG
+	Sample1,plate_1,GTSeq_001,ATCACG,E01,CATTTC
+	Sample1,plate_1,GTSeq_001,ATCACG,F01,AAGTCC
+	...
+- edit python script: path to csv input file, fastq input file, @HISEQ/MISEQ/NOVASEQ identifier based on your fastqs
+- need to have newest python, multiprocess installed
+	e.g. pip install multiprocess
+	e.g. module spider python
+		 module load python
+- run script: python GTseq_BarcodeSplit_MP.py
+- note: results will take a bit to come in (~1 hour), all files will go into main folder - clean up:
+	mkdir Individuals
+	mv -i GTSeq_0*.fastq Individuals/ 
+- can check to make sure all the files have information in them with:
+	ls -l Individuals #should see no zeroes under the file sizes column 
+- troubleshooting notes: 
+	- may need to convert csv file format if using a mac to unix format
+		tr '\r' '\n' < barcode_analysis.csv > barcode_analysis_edit.csv 
+		file barcode_analysis_edit.csv   #see it has been converted to ASCII text (unix format)
+	- if spaces in between lins of csv, will need to remove
+		sed -i '/^$/d' barcode_analysis_edit.csv
+	- may need to add line ending - can do by opening file with vi & saving
+		vi barcode_analysis_edit.csv   
+		:w #write file
+		:q #quit  
+	- other troubleshooting (maybe need depending on how you save the csv)
+		#if commas after each line - need to remove
+		sed 's/,$//' barcode_analysis_edit.csv
+
+
+
+** B. ALIGNMENT: ALIGN READS TO REFERENCE GENOME USING BWA **
+
+- download genome from ncbi website (we use old genome RefSeq: GCF_000687225.1)
+- open the genome file & navigate to fasta file:
+	tar -xvf genome_assemblies_genome_fasta.tar
+	cd ncbi-genomes-year-mm-dd/
+- gunzip & convert - fasta file format is with fna extension, code will expect fasta with fa extension
+	e.g. gunzip GCF_000687225.1_UrsMar_1.0_genomic.fna.gz
+	cp GCF_000687225.1_UrsMar_1.0_genomic.fna Ursus_maritimus.NCBI1.0.fa
+- need to create reference index - can do as an interactive job (see compute canada resources)
+	module load mugqic/bwa/0.7.17
+	module load mugqic/samtools/1.12
+	e.g. bwa index Ursus_maritimus.NCBI1.0.fa
+- easier to run alignment script for each library separately so let's do some reorganization of the raw fastq data	
+	- e.g. within Individuals folder from before, make directories for each plate you have & move fastq files to appropriate directory
+	mkdir plate1_samples plate2_samples plate3_samples ...
+	e.g. mv *plate2*.fastq plate2_samples
+- the script we will be using expects gzipped fastq files to process samples
+	gzip -v -k *.fastq  #-v will give you % done, -k so don't delete og files
+- create bwa_gtseq.sh script with nano, make sure to edit so all file paths are correct, run with sbatch 
+- notes:
+	- can check results file with:
+		module spider samtools
+		module load samtools
+		samtools view *file name.bam
+		control C to quit viewing 
+	- only need .aligned.sorted.bam & .aligned.sorted.bam.bai files for variant calling, recommend moving these into own folder to make next steps easier 
+		e.g. cp -r file_path/Individuals/plate2_samples/bam/*.aligned.sorted.bam file file_path/bwa_results/plate2
+			 cp -r file_path/Individuals/plate2_samples/bam/*.aligned.sorted.bam.bai file_path/bwa_results/plate2
+
+
+
+** C. VARIANT CALLING USING BCFTOOLS **
+
+
+-Notes:
+	- Next step is to detect variants by looking at the alignments of all your individuals together.
+	- This script has two parts to it, and the output of the first part is piped directly into the second part to save time and space.
+	- The first step is the "mpileup" where all the BAMs are put together, the second is the "call" which detects and outputs variants.
+	- You need to make a "bam-list", which is a text file giving the locations of all the BAM files you would like analyzed together.
+	- You can do some filtering of your BAM files as part of this. The -q flag for example only keeps reads that aligned with a mapping quality score of 30.
+	- To look at a subset of SNPs we have already identified (our GT-seq SNPs), we use to -T flag here 
+	- We recommend using separate scripts/input files for autosomal vs. sex-linked markers to keep data separate 
+- bring in a text/tab delimited file with gene names/positions/alleles - e.g.
+	locus_id	position	T,G
+	locus_id	position	G,A
+	locus_id	position	G,C
+	locus_id	position	G,A
+	...
+- bcftools now wants a specific format of input file (http://samtools.github.io/bcftools/bcftools.html), run to convert format:
+	cp file_name.txt als.tsv
+	bgzip als.tsv -c > als.tsv.gz && tabix -s1 -b2 -e2 als.tsv.gz #result is files called als.tsv.gz & als.tsv.gz.tbi
+- bring in text file with all bam file names & locations - e.g. 
+	file_path/bwa_results/plate2/file_name1.aligned.sorted.bam
+	file_path/bwa_results/plate2/file_name2.aligned.sorted.bam
+	file_path/bwa_results/plate2/file_name3.aligned.sorted.bam
+	file_path/bwa_results/plate2/file_name4.aligned.sorted.bam
+	...
+- may need to add line ending by opening the file with vi:
+	vi bamlist_plate2.txt
+	:wq
+- may want to copy genome + related files over to working folder to make easier on you	
+- create script with nano, edit file names/filtering parameters (i.e. this is where you would edit depth), submit script
+	nano gtseq_calling.sh
+	sbatch gtseq_calling.sh 
+- output from this script is a vcf (per plate) - can use concatenate in bcftools to merge files & PGDSpider to convert from vcf to genpop if needed
+	
+	
+** NOTE: ALTERNATIVELY, CAN USE CAMPBELL ET AL. (2015) VARIANT CALLING SCRIPTS FOR SEX-LINKED MARKERS
+- sex-linked markers are not used in main population analysis (no need to worry about combining data called with different methods) 
+- thus, could use quick method here to get sex-linked genotypes
+
+*Working with String::Approx/CPAN*
+- need to have String::Approx downloaded via cpan for script to work
+	https://www.thegeekstuff.com/2008/09/how-to-install-perl-modules-manually-and-using-cpan-command/
+	https://apple.stackexchange.com/questions/89271/how-to-install-modules-from-cpan-without-sudo
+	https://www.tutorialspoint.com/unix_commands/cpan.htm
+- configuring cpan:
+	cpan
+	#will ask how want to configure (automatically?) - just hit enter
+	#will ask where you want to - default is local::lib - just hit enter
+	#will ask if want to translate to .bachrc file - hit enter/yes
+	#will run some stuff then viola it is downloaded & you should have cpan>[2] or similar
+- within interactive cpan, use install:
+	cpan
+	install String::Approx
+- may need to update perl, cpan if running into issues - then reinstall String::Approx
+	#some helpful commands may be:
+	perl -MCPAN -e 'recompile()'
+	brew install perl #use homebrew to update
+	upgrade #within cpan interface
+	perl -MCPAN -e 'install Bundle::CPAN' #another way to upgrade cpan 
+
+*Campbell et al. (2015) calling method* 
+- this method does not require alignment = just uses raw fastq files for each individual 
+- supply file containing locus names, allele names, in-silico probe sequences in .csv format 
+	- note: don't forget to convert csv file format as above if needed 
+	- e.g. for LocusInfo_GenotypingStep_sex.csv:
+	locus_id	G	A	TCA...	TCA...	TGT...	0	0						
+	locus_id	G	A	TGC...	TGC...	CGA...	0	0
+- you also will need the file GTseq_Genotyper_v3.pl from the Campbell et al. GT-seq github, no edits needed 
+- bring in variant calling script from Campbell et al. GT-seq github: run_genotyper_for_all_R1.sh
+	sbatch run_genotyper_for_all_R1.sh
+- output files will be in a new directory called genos_step3output - these contain read counts for each allele, the A1/A2 ratio, Genotype, and Genotype class
+- output files can be compiled into one file that collects counts at each locus for each individual & provides summary statistics:
+	- supply GTseq_GeneCompile_v3.pl script from Campbell et al. GT-seq github 
+	- GTseq_GeneCompile_v3.pl must be in the directory genos_step3output
+	- run script: perl GTseq_GenoCompile_v3.pl > Library_Counts.csv

@@ -1,0 +1,101 @@
+NOTES/TROUBLESHOOTING GUIDE: GT-SEQ CAMPBELL ET AL. (2015) PIPELINE FOR GT-SEQ DATA 
+
+Genotyping-in-thousands by sequencing (GT-seq) of non-invasive fecal and degraded samples: 
+	a new panel to enable ongoing monitoring of Canadian polar bear populations
+	
+Kristen Hayward, Rute Clemente-Carvalho, Evelyn Jensen, Peter Van Coeverden de Groot, 
+	Marsha Branigan, Markus Dyck, Christina Tschritter, Zhengxin Sun, Stephen Lougheed
+	
+
+** A. DEMULTIPLEXING FASTQ FILES **
+
+Note: Demultiplexing steps are pulled from Nate Campbell 2015 GT-seq pipeline,
+	uses GTseq_BarcodeSplit_MP.py script from Campbell et al. (2015) github
+
+See Nate Campbell GTseq-Pipeline for scripts: https://github.com/GTseq/GTseq-Pipeline
+
+- important note = if NOVASEQ was used, i5 sequences need to be in reverse complement in input file
+- create csv file with barcodes - e.g.
+	Sample_name,Plate_ID,i7_name,i7_sequence,i5_name,i5_sequence
+	Sample1,plate_1,GTSeq_001,ATCACG,A01,CCGTTT
+	Sample1,plate_1,GTSeq_001,ATCACG,B01,AAGAGT
+	Sample1,plate_1,GTSeq_001,ATCACG,C01,CGGAAT
+	Sample1,plate_1,GTSeq_001,ATCACG,D01,GCCTCG
+	Sample1,plate_1,GTSeq_001,ATCACG,E01,CATTTC
+	Sample1,plate_1,GTSeq_001,ATCACG,F01,AAGTCC
+	...
+- edit python script: path to csv input file, fastq input file, @HISEQ/MISEQ/NOVASEQ identifier based on your fastqs
+- need to have newest python, multiprocess installed
+	e.g. pip install multiprocess
+	e.g. module spider python
+		 module load python
+- run script: python GTseq_BarcodeSplit_MP.py
+- note: results will take a bit to come in (~1 hour), all files will go into main folder - clean up:
+	mkdir Individuals
+	mv -i GTSeq_0*.fastq Individuals/ 
+- can check to make sure all the files have information in them with:
+	ls -l Individuals #should see no zeroes under the file sizes column 
+- troubleshooting notes: 
+	- may need to convert csv file format if using a mac to unix format
+		tr '\r' '\n' < barcode_analysis.csv > barcode_analysis_edit.csv 
+		file barcode_analysis_edit.csv   #see it has been converted to ASCII text (unix format)
+	- if spaces in between lins of csv, will need to remove
+		sed -i '/^$/d' barcode_analysis_edit.csv
+	- may need to add line ending - can do by opening file with vi & saving
+		vi barcode_analysis_edit.csv   
+		:w #write file
+		:q #quit  
+	- other troubleshooting (maybe need depending on how you save the csv)
+		#if commas after each line - need to remove
+		sed 's/,$//' barcode_analysis_edit.csv
+
+
+
+
+** B. OPTIONAL - TESTING THE PLATE ** 
+
+- Note from Campbell et al: 
+	- test plate fastq files for the presence of forward primers & probes using the GTseq_SeqTest.pl script
+	- This script counts the occurrence of each forward primer sequences, in-silico probe sequences, 
+	  and when both occur within the same sequence read. 
+	- This can help ID primers that create large numbers of artefact sequences
+- first, create a tab delimited text file containing loci name, forward primer sequence, allele 1 probe, and allele 2 probe.
+  e.g. LocusName1 ACTGTGCCCGTTACCCGACC TGCAATGAAACTGAA TGCAATTAAACTGAA
+       LocusName2 ...
+    - don't forget to convert format to unix if needed & open with vi to add line ending (as above)
+- also need a test plate file that you are going to create from the raw fastq data
+	grep -A3 '^@NOVESEQ.*:ATCACG' Undetermined_S0_L001_R1_001.fastq | grep -v '^--$' > testPlate1.fastq 
+	grep -A3 '^@NOVASEQ.*:ATCACG' Undetermined_S0_L001_R2_001.fastq | grep -v '^--$' > testPlate2.fastq 
+- Then, create a hash file for plates (scripts on Campbell github):
+    perl GTseq_HashSeqs.pl testPlate1.fastq > testPlate1.hash
+    perl GTseq_HashSeqs.pl testPlate2.fastq > testPlate2.hash
+- Next use the GTseq_SeqTest.pl script (Campbell github) 
+	perl GTseq_SeqTest.pl assayinfo_testplate_final.csv testPlate1.hash > Plate1.seqtest.csv
+	perl GTseq_SeqTest.pl assayinfo_testplate_final.csv testPlate2.hash > Plate2.seqtest.csv
+- Output should look like this:
+	LocusName1,3096,2609,2367
+	LocusName2,32252,27475,25867
+	LocusName3,34435,34826,33213
+	LocusName4,18875,18934,18049
+	LocusName5,2349,2430,2210
+	LocusName6,11217,11378,10510
+
+
+
+
+** C. GENOTYPE CALLING ** 
+
+- this method does not require alignment = just uses raw fastq files for each individual 
+- supply file containing locus names, allele names, in-silico probe sequences in .csv format 
+	- note: don't forget to convert csv file format as above if needed 
+	- e.g. for LocusInfo_GenotypingStep.csv:
+	locus_id	G	A	TCA...	TCA...	TGT...	0	0						
+	locus_id	G	A	TGC...	TGC...	CGA...	0	0
+- you also will need the file GTseq_Genotyper_v3.pl from the Campbell et al. GT-seq github, no edits needed 
+- bring in variant calling script from Campbell et al. GT-seq github: run_genotyper_for_all_R1.sh
+	sbatch run_genotyper_for_all_R1.sh
+- output files will be in a new directory called genos_step3output - these contain read counts for each allele, the A1/A2 ratio, Genotype, and Genotype class
+- output files can be compiled into one file that collects counts at each locus for each individual & provides summary statistics:
+	- supply GTseq_GeneCompile_v3.pl script from Campbell et al. GT-seq github 
+	- GTseq_GeneCompile_v3.pl must be in the directory genos_step3output
+	- run script: perl GTseq_GenoCompile_v3.pl > Library_Counts.csv
