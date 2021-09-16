@@ -1,0 +1,130 @@
+---
+title: "Relatedness script - GT-seq 2021 Manuscript - Kristen Hayward "
+output: html_notebook
+---
+
+Load (install if needed first) all the required packages:
+```{r}
+library(ggplot2) #used here for visualization 
+library(adegenet)
+library(related)
+library(viridis) #used here for visualization 
+```
+
+Custom theme for visualizations:
+```{r}
+coolbeans<- theme(
+  legend.position= "right",
+  legend.title= element_text(size = 15),
+  legend.text= element_text(size = 12),
+  axis.text.x= element_text(size=12, colour="black", face= "bold"),
+  axis.text.y= element_text(size=12, colour="black", face= "bold"),
+  axis.title.x= element_text(size=15, colour="black", vjust= +0.5, face= "bold"),
+  axis.title.y= element_text(size=15, colour="black", vjust=+0.5, face= "bold"),
+  panel.background= element_rect(fill="white", colour=NULL),
+  axis.line= element_line(colour="black", size=0.5),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank()
+  )
+```
+
+Import your genotype data into R in the "genind" format:
+```{r}
+#set your working directory to the folder you will be working from 
+setwd("path/to/relatedness/folder")
+
+#will need to have your genotype data in genind format: https://adegenet.r-forge.r-project.org/files/tutorial.pdf https://cran.r-project.org/web/packages/adegenet/adegenet.pdf
+file_genind<- import2genind("filename.gen", ncode = 3L) #ncode = 3L = alleles encoded with 3 characters
+
+rev(file_genind)[1] #reverse order 
+```
+
+
+Write your genind file to dataframe:
+```{r}
+data_df<- genind2df(file_genind, sep= "\t")
+write.table(data_df, file = "filename_dataframe", sep="\t", row.names=TRUE, col.names=FALSE)
+```
+
+You will now need to edit this file in a text editor (e.g. BBEdit) to make it the correct input format for the related package (see tutorial at https://github.com/timothyfrasier/related/blob/master/Tutorial.pdf): 
+  - make sure column one is individual ID, each row = data for one individual
+  - column 2 is allele 1 for locus 1, column 3 is allele 2 for locus 1
+  - remove any quotations present
+  - have to change 0s to 0 /tab here/ 0 because thinks one allele (rather than 2 separate) as default
+  - save as filename_related_input.txt
+
+
+Bring files into related package:
+```{r}
+#import input genotypes
+related_input<- read.table("filename_related_input.txt", header=FALSE, sep="\t", stringsAsFactors = FALSE)
+head(related_input) #take a look at the data to make sure it's ok - I get an extra column at end for some reason 
+related_input<- Pb_relatedness_input[,1:645] #just removing the extra column 
+
+#other/alternative method to input data
+related_data<-readgenotypedata(related_input)
+```
+
+The related package includes 4 different estimators for relatedness. To decide which estimator to use for your analysis, you can use the function compareestimators to see which estimator is likely to work the best with your data. 
+
+See what estimators work best:
+```{r}
+compareestimators(related_data, 100)
+```
+Our correlation coefficients between observed & expected values were as follows:
+wang		0.966718
+lynchli		0.966682
+lynchrd		0.970642
+quellergt	0.970746
+We chose to proceed with the quellergt coefficient, as it is the largest here. 
+
+
+Calculate relatedness values, change genotyping error rate & correlation coefficient as appropriate: 
+```{r}
+relatedness_output<-coancestry(related_input, error.rates=0.05, quellergt = 1)
+```
+
+
+Visualize your data with a histogram of pairwise relatedness values:
+```{r}
+ggplot(relatedness_output$relatedness, aes(x=quellergt))+
+  geom_histogram(binwidth = 0.025, colour = "black", fill = "sienna3")+
+  scale_x_continuous(expand=c(0,0), name = "quellergt relatedness")+
+  scale_y_continuous(expand=c(0,0), name = "density")+
+  coolbeans
+```
+
+
+You can write the relatedness values to a text document:
+```{r}
+write.table(relatedness_output$relatedness,"filename-relatedness.txt",sep=",",row.names = TRUE, col.names = TRUE)
+```
+
+
+Simulate related individuals based on allele frequencies from our data:
+```{r}
+sim <- familysim(related_data$freqs, 100)
+sim_output  <- coancestry(sim , quellergt =1)
+simrel  <- cleanuprvals(sim_output$relatedness , 100)
+relvalues  <- simrel[, 10]
+label1  <- rep("PO", 100)
+label2  <- rep("Full", 100)
+label3  <- rep("Half", 100)
+label4  <- rep("Unrelated", 100)
+Relationship<- c(label1 , label2 , label3 , label4)
+newdata  <- as.data.frame(cbind(Relationship , relvalues))
+newdata$relvalues  <- as.numeric(as.character(newdata$relvalues))
+```
+
+
+Plot simulated data:
+```{r}
+ggplot(newdata, aes(x= relvalues, colour = Relationship, fill = Relationship))+ 
+  geom_density(alpha = 0.3, size = 0.75)+
+  scale_x_continuous(name = "quellergt relatedness")+
+  scale_y_continuous(name = "density")+
+  scale_colour_viridis(discrete = TRUE, option = "D")+
+  scale_fill_viridis(discrete = TRUE, option = "D")+
+  coolbeans
+```
+

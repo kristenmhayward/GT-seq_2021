@@ -1,0 +1,115 @@
+---
+title: "Self-assignment script - GT-seq 2021 manuscript - Kristen Hayward"
+output: html_notebook
+---
+
+Tutorial:https://alexkychen.github.io/assignPOP/analyze.html
+
+Install and load package:
+```{r}
+install.packages("assignPOP")
+library(assignPOP)
+```
+
+
+For this manuscript, we evaluated self-assignment in two ways: (1) based on Management Units/MUs, and (2) based on STRUCTURE-determined genetic clusters. 
+
+
+**1. SELF-ASSIGNMENT - MUs**
+
+Don't forget to remove populations with <10 individuals prior to importing genetic data (GT-seq genotypes in genpop format). Import data: 
+```{r}
+genpop<- read.Genepop("file/path/genepop_file.txt", pop.names = c("pop1","pop2","pop3","etc."),haploid = FALSE)
+```
+
+
+Monte-Carlo cross-validation:
+```{r}
+assign.MC(genpop, train.inds = 0.75, train.loci = 0.75, iterations = 30, model = "svm", dir = "MU_results/")
+```
+
+
+Calculate assignment accuracy:
+```{r}
+accuMC<- accuracy.MC(dir = "MU_results/")
+```
+
+
+Can read results in R:
+```{r}
+accuMC<- read.table("MU_results/Rate_of_30_tests_11_pops.txt",header = T)
+View(accuMC)
+```
+
+
+Visualize results:
+```{r}
+#create boxplot for assignment accuracy
+library(ggplot2)
+accuracy.plot(accuMC, pop = c("pop1","pop2","pop3","etc."))+
+  ylim(0,1)+
+  annotate("segment", x = 0.4, xend = 3.6, y = 0.33, yend = 0.33, colour = "firebrick", size = 1)+  #add red line at 0.3
+  ggtitle("Monte-Carlo cross-validation using genetic loci")+ #add a plot title
+  theme(plot.title = element_text(size = 20, face = "bold"))
+```
+
+
+Print mean and standard deviation across assignment tests:
+```{r}
+assign.matrix(dir = "file/path/to/folder/MU_results/")
+```
+
+
+
+
+
+**SELF-ASSIGNMENT - STRUCUTRE GENETIC CLUSTERS**
+
+Import structure file:
+```{r}
+clusterfile<- read.Structure("file/path/to/structure/file/filename.txt")
+
+#keep in mind which pop is which, for us: 
+#pop1 = arctic archipelago
+#pop2 = polar basin
+#pop3 = hudson complex
+#pop4 = m'clintok channel
+```
+
+
+Monte-Carlo cross-validation:
+```{r}
+assign.MC(clusterfile, train.inds = 0.75, train.loci = 0.75, iterations = 30, model = "svm", dir = "cluster_results/")
+```
+
+
+Calculate assignment accuracy:
+```{r}
+accuMC_clusters<- accuracy.MC(dir = "cluster_results/")
+```
+
+
+Can read results in R:
+```{r}
+accuMC_clusters<- read.table("cluster_results/Rate_of_30_tests_4_pops.txt",header = T)
+View(accuMC_clusters)
+```
+
+
+Visualize results:
+```{r}
+#create boxplot for assignment accuracy
+library(ggplot2)
+accuracy.plot(accuMC_clusters, pop = c(1,2,3,4))+
+  ylim(0,1)+
+  annotate("segment", x = 0.4, xend = 3.6, y = 0.33, yend = 0.33, colour = "firebrick", size = 1)+  #add red line at 0.3
+  ggtitle("Monte-Carlo cross-validation using genetic loci")+ #add a plot title
+  theme(plot.title = element_text(size = 20, face = "bold"))
+```
+
+
+Print mean and standard deviation across assignment tests:
+```{r}
+assign.matrix(dir = "file/path/to/cluster_results/")
+```
+
