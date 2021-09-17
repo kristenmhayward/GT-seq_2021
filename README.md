@@ -3,7 +3,7 @@ Pipelines and scripts used by Hayward et al. (2021)
 Genotyping-in-thousands by sequencing (GT-seq) of non-invasive fecal and degraded samples:  a new panel to enable ongoing monitoring of Canadian polar bear populations
 
 Thank you for checking out our data/scripts. 
-All credit for GT-seq pipeline scripts goes Campbell et al. (2015): https://github.com/GTseq/GTseq-Pipeline
+All credit for GT-seq pipeline scripts goes to Campbell et al. (2015): https://github.com/GTseq/GTseq-Pipeline
 Campbell, N.R., S.A. Harmon, and S.R. Narum. 2015. Genotyping-in-thousands by sequencing (GT-seq): a cost effective SNP genotyping method based on custom amplicon sequencing. Molecular Ecology Resources 15:855-867.
 
 Please read carefully, and feel free to contact k.hayward@queensu.ca with any questions. 
