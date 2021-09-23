@@ -16,5 +16,6 @@ Descriptions of files:
 5. bcftools_pipeline_2021.txt: notes/troubleshooting guide for a bcftools genotyping pipeline
 6. extraparams.txt: extraparams file for STRUCTURE analysis
 7. gtseq_campbell_pipeline2021.txt: notes/troubleshooting guide for Campbell et al. (2015) GT-seq pipeline 
-8. mainparams.txt: mainparams file for STRUCTURE analysis
-9. structure_job_list.txt: STRUCTURE scripts for analysis 
+8. logistic_regression.R: R script for logistic regression on qPCR-determined DNA quantity (ng/uL) & genotyping success (0,1)
+9. mainparams.txt: mainparams file for STRUCTURE analysis
+10. structure_job_list.txt: STRUCTURE scripts for analysis 
