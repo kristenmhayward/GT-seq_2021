@@ -1,5 +1,5 @@
 # GT-seq_2021
-Pipelines and scripts used by Hayward et al. (2021) 
+Pipelines, scripts, and raw sequencing data used by Hayward et al. (2021) 
 Genotyping-in-thousands by sequencing (GT-seq) of non-invasive fecal and degraded samples:  a new panel to enable ongoing monitoring of Canadian polar bear populations
 
 Thank you for checking out our data/scripts. 
@@ -14,8 +14,10 @@ Descriptions of files:
 3. KHayward_self-assignment.Rmd: R notebook for self-assignment tests
 4. Pb-relatedness.txt: raw pairwise relatedness values from 642 individuals (GT-seq + ddRAD data) 
 5. bcftools_pipeline_2021.txt: notes/troubleshooting guide for a bcftools genotyping pipeline
-6. extraparams.txt: extraparams file for STRUCTURE analysis
-7. gtseq_campbell_pipeline2021.txt: notes/troubleshooting guide for Campbell et al. (2015) GT-seq pipeline 
-8. logistic_regression.R: R script for logistic regression on qPCR-determined DNA quantity (ng/uL) & genotyping success (0,1)
-9. mainparams.txt: mainparams file for STRUCTURE analysis
-10. structure_job_list.txt: STRUCTURE scripts for analysis 
+6. ddRAD_and_GTseq_inds.culled2_genepop.txt - raw GT-seq and ddRADseq sequencing data for GT-seq panel SNPs in genepop format. 
+7. ddRAD_and_GTseq_inds.culled2x.recode.vcf - raw GT-seq and ddRADseq sequencing data for GT-seq panel SNPs in vcf format. 
+8. extraparams.txt: extraparams file for STRUCTURE analysis
+9. gtseq_campbell_pipeline2021.txt: notes/troubleshooting guide for Campbell et al. (2015) GT-seq pipeline 
+10. logistic_regression.R: R script for logistic regression on qPCR-determined DNA quantity (ng/uL) & genotyping success (0,1)
+11. mainparams.txt: mainparams file for STRUCTURE analysis
+12. structure_job_list.txt: STRUCTURE scripts for analysis 
